@@ -7,6 +7,7 @@ from scipy.spatial import ConvexHull  # pylint: disable=no-name-in-module
 from scipy.sparse import csr_matrix
 from scipy.interpolate import interp1d
 from scipy.ndimage import label, binary_dilation
+from scipy.signal import savgol_filter
 from joblib import Parallel, delayed
 
 from crism_ml import N_JOBS
@@ -265,6 +266,7 @@ def medfilt1(array, size):
         return _medfilt1_bk(array, size)
     except ImportError:
         return _medfilt1_np(array, size)
+  
 
 
 def spikes(pixspec, size, sigma, mask=False):
@@ -295,7 +297,8 @@ def spikes(pixspec, size, sigma, mask=False):
         """Mean with broadcast."""
         return np.mean(arr, keepdims=True)
 
-    pixmed = medfilt1(pixspec, size)
+    #pixmed = medfilt1(pixspec, size)
+    pixmed = savgol_filter(pixspec, size)
     diff = np.abs(pixmed - pixspec)
     # Matlab uses the unbiased std, passing ddof=1 to align
     ind = diff > _mean(np.mean(diff[..., :N_BANDS], axis=-1)) + \
@@ -359,11 +362,14 @@ def remove_spikes_column(pixspec, size, sigma, copy=True):
         pixspec = pixspec.copy()
 
     col_avg = np.mean(pixspec[..., :N_BANDS], axis=0)
-    diff = np.abs(col_avg - medfilt1(col_avg, size))
+    #diff = np.abs(col_avg - medfilt1(col_avg, size))
+    diff = np.abs(col_avg - savgol_filter(col_avg, size))
     ind = diff > np.mean(diff, axis=-1, keepdims=True) + \
         sigma * np.std(diff, ddof=1, axis=-1, keepdims=True)
 
-    pixmed = medfilt1(pixspec[..., :N_BANDS], size)
+    #pixmed = medfilt1(pixspec[..., :N_BANDS], size)
+    pixmed = savgol_filter(pixspec[..., :N_BANDS], size)
+    
     xx_, zz_ = ind.nonzero()
     pixspec[:, xx_, zz_] = pixmed[:, xx_, zz_]
 
